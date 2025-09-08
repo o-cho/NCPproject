@@ -1,49 +1,54 @@
-# Action 파일 제목
+# Action 파일 제목 (GitHub Actions 탭에 표시되는 이름)
 name: Spring Boot Gradle CI/CD
 
-# 어디에 올릴 건지
+# 언제 이 워크플로우를 실행할지 설정
 on:
   push:
-    branches: ["main"]
-  # 수동으로 Action 실행할 수 있게 해주는 옵션
-  workflow_dispatch:
+    branches: ["master"]  # master 브랜치에 push 될 때 실행
+  workflow_dispatch:     # 수동으로 실행 버튼을 눌러서도 실행 가능
 
-# 진행할 내용 
+# 실행할 작업(job) 정의
 jobs:
-  # build, 배포에 활용되는 환경 잡아주기
+  # build와 deploy를 하나의 job으로 묶음
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest   # GitHub이 제공하는 Ubuntu 최신 버전 VM에서 실행
     
-    steps:
-      # 파일에 문제가 없는지 체크
+    steps:   # job 안에서 실행할 단계들
+      # 1. 저장소 코드 가져오기
       - name: Checkout repository
         uses: actions/checkout@v3
-      # 자바 버전 세팅
+
+      # 2. JDK 17 설치 (자바 프로젝트 실행 환경 준비)
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
-          distribution: 'temurin'
+          distribution: 'temurin'  # OpenJDK 배포판
           java-version: '17'
-      # Gradle 세팅
+
+      # 3. Gradle 실행 환경 세팅 (캐시 등 최적화)
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2
-      # Gradlew 파일 실행 권한 부여
+
+      # 4. gradlew 파일 실행 권한 주기 (리눅스 환경에서 실행할 수 있게)
       - name: Grant execute permission for Gradlew
         run: chmod +x ./gradlew
-      # 빌드
+
+      # 5. Spring Boot 애플리케이션 빌드 (테스트는 -x test 옵션으로 제외)
       - name: Build JAR with Gradle
         run: ./gradlew clean bootJar -x test
-      # Jar 파일 복사해서 Public Server로 보내기
+
+      # 6. 빌드된 JAR 파일을 Public Server로 복사
       - name: Copy JAR to Public Server
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.PUBLIC_HOST }}
-          username: root
-          key: ${{ secrets.PUBLIC_SSH_KEY }}
-          source: | # SNAPSHOT.jar로 끝나는 모든 파일을 전송
+          host: ${{ secrets.PUBLIC_HOST }}       # 서버 IP (Secrets에 저장됨)
+          username: root                         # 접속 계정
+          key: ${{ secrets.PUBLIC_SSH_KEY }}     # 개인키 (Secrets에 저장됨)
+          source: | # build/libs 폴더 안의 *SNAPSHOT.jar 파일을 전송
             build/libs/*SNAPSHOT.jar
-          target: /root/app/
-          
+          target: /root/app/                     # 서버의 /root/app/ 폴더에 저장
+
+      # 7. 배포 스크립트(deploy_private.sh)를 Public Server로 복사
       - name: Copy deploy script to Public Server
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -51,15 +56,16 @@ jobs:
           username: root
           key: ${{ secrets.PUBLIC_SSH_KEY }}
           source: |
-            deploy_private.sh
-          target: /root/app/
+            deploy_private.sh                    # 로컬 저장소의 스크립트
+          target: /root/app/                     # 서버에 복사할 위치
 
+      # 8. 서버에서 배포 스크립트 실행
       - name: Execute deploy_private.sh on Public Server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.PUBLIC_HOST }}
           username: root
           key: ${{ secrets.PUBLIC_SSH_KEY }}
-          script: |
-            chmod +x /root/app/deploy_private.sh
-            /root/app/deploy_private.sh
+          script: |   # 서버에서 실행할 명령어들
+            chmod +x /root/app/deploy_private.sh  # 실행 권한 부여
+            /root/app/deploy_private.sh           # 배포 스크립트 실행
