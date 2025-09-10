@@ -14,10 +14,10 @@ eval $(ssh-agent -s)
 ssh-add $PRIVATE_KEY
 
 
-ssh -o StrictHostKeyChecking=no $PRIVATE_USER@$PRIVATE_HOST "mkdir -p /root/app"
+ssh -o StrictHostKeyChecking=no $PRIVATE_USER@$PRIVATE_HOST "mkdir -p /root/app" # -p : 이미 해당 디렉토리가 있으면 pass
 
-
-scp -o StrictHostKeyChecking=no /root/app/*.jar $PRIVATE_USER@$PRIVATE_HOST:/root/app/app.jar
+# scp : 파일 전송 명령어 /root/app/build/libs*.jar 파일을 /root/app/app.jar라는 이름으로 저장
+scp -o StrictHostKeyChecking=no /root/app/build/libs*.jar $PRIVATE_USER@$PRIVATE_HOST:/root/app/app.jar
 
 
 ssh -o StrictHostKeyChecking=no $PRIVATE_USER@$PRIVATE_HOST "nohup java -jar /root/app/app.jar > /root/app/app.log 2>&1 &"
